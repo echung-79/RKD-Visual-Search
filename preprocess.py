@@ -1,7 +1,12 @@
+import os
+
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
-IMAGE_EMBEDDINGS_PATH = 'data/image_embeddings.npz'
+from encode_image import DATA_DIR, embed_text
+
+IMAGE_EMBEDDINGS_PATH = os.path.join(DATA_DIR, 'image_embeddings.npz')
 
 ############################
 ### Pre Processing Logic ###
@@ -54,9 +59,13 @@ def _load_image_vecs(path):
 
 
 def preprocess(df, image_embeddings_path=IMAGE_EMBEDDINGS_PATH):
-    """Builds a natural language document and attaches SigLIP2 image vectors for each record"""
+    """Builds a natural language document and attaches SigLIP2 image + description vectors for each record"""
     df = df.copy()
     df['embedding_text'] = df.apply(_build_text, axis=1)
     vecs_by_priref = _load_image_vecs(image_embeddings_path)
     df['image_vecs'] = df['priref'].map(lambda p: vecs_by_priref.get(p, []))
+    df['description_vec'] = [
+        embed_text(text)[0].tolist()
+        for text in tqdm(df['embedding_text'], desc="Embedding descriptions", unit="rec")
+    ]
     return df

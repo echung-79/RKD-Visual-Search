@@ -7,6 +7,8 @@ from PIL import Image
 from tqdm import tqdm
 from transformers import AutoModel, AutoProcessor
 
+MAX_SIDE = 1024
+
 # load the model and processor
 MODEL_ID = "google/siglip2-base-patch16-224"
 device = 'cuda' if torch.cuda.is_available() else "cpu"
@@ -14,8 +16,8 @@ device = 'cuda' if torch.cuda.is_available() else "cpu"
 model = AutoModel.from_pretrained(MODEL_ID).to(device)
 processor = AutoProcessor.from_pretrained(MODEL_ID)
 
-IMAGES_DIR = 'data/Test Set'
-MAX_IMAGE_SIDE = 1024  # cap source resolution before the processor's own resize to 224x224
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, 'data')
+IMAGES_DIR = os.path.join(DATA_DIR, 'Test Set')
 
 
 def l2_normalize(x: np.ndarray) -> np.ndarray:
@@ -24,36 +26,41 @@ def l2_normalize(x: np.ndarray) -> np.ndarray:
     return (x / norms).astype('float32')
 
 
-def preprocess_image(im: Image.Image, max_side: int = MAX_IMAGE_SIDE) -> Image.Image:
-    """Convert to RGB and downscale to a standard resolution cap.
-    Source scans (.jp2) can be far larger than the model needs, so this keeps
-    decoding/resizing cheap and memory bounded before the processor resizes to 224x224."""
-    im = im.convert('RGB')
-    if max(im.size) > max_side:
-        im.thumbnail((max_side, max_side), Image.LANCZOS)
-    return im
+@torch.no_grad()
+def embed_image(path: str):
+    """
+    Given an image path an image is loaded, preprocessed,
+    and embedded using a locally run siglip2 model
+    """
+    # Load Image from Path
+    try:
+        image = Image.open(path)
+    except OSError as e:
+        raise FileNotFoundError(f"Invalid image path: {path}") from e
+
+    # Convert to RGB and downscale if necessary
+    image = image.convert("RGB")
+    if max(image.size) > MAX_SIDE:
+        image.thumbnail((MAX_SIDE, MAX_SIDE), Image.LANCZOS)
+
+    inputs = processor(image, return_tensors="pt").to(device)
+    feats = model.get_image_features(**inputs).pooler_output
+    vector = feats.cpu().numpy()
+    return l2_normalize(vector)
 
 @torch.no_grad()
-def embed_images(images: list[Image.Image], batch_size: int = 16) -> np.ndarray:
-    """One L2-normalized vector per image"""
-    chunks = []
-    with tqdm(total=len(images), desc="Embedding images", unit="img") as pbar:
-        for i in range(0, len(images), batch_size):
-            batch = images[i:i+batch_size]
-            inputs = processor(images=batch, return_tensors="pt").to(device)
-            feats = model.get_image_features(**inputs).pooler_output
-            chunks.append(feats.cpu().numpy())
-            pbar.update(len(batch))
-    return l2_normalize(np.concatenate(chunks, axis=0))
+def embed_text(x: str):
+    """
+    Given a string, embeds it using
+    a locally run siglip2 model
+    """
+    inputs = processor(text = x, return_tensors = "pt").to(device)
+    feats = model.get_text_features(**inputs).pooler_output
+    vector = feats.cpu().numpy()
+    return l2_normalize(vector)
 
-def search(query_vec: np.ndarray, index: np.ndarray, k: int = 5):
-    """Cosine similarity"""
-    scores = index @ query_vec        # (N,) similarity to every record
-    top = np.argsort(-scores)[:k]
-    return [(int(i), float(scores[i])) for i in top]
-
-def main():
-    rkd_df = pd.read_csv('data/adlib.csv', encoding='utf-8-sig')
+if __name__ == "__main__":
+    rkd_df = pd.read_csv(os.path.join(DATA_DIR, 'adlib.csv'), encoding='utf-8-sig')
     # one record can have multiple images, with filepaths given by media_reference_numbers
     # images are cached locally as data/images/{filename}; skip ones we don't have
     priref_list, filename_list, image_paths = [], [], []
@@ -70,24 +77,24 @@ def main():
     if not image_paths:
         raise SystemExit(f"No local images found under {IMAGES_DIR}/ — nothing to embed")
 
-    images, good_prirefs, good_filenames = [], [], []
+    embeddings, good_prirefs, good_filenames = [], [], []
     for priref, filename, path in tqdm(
         zip(priref_list, filename_list, image_paths),
-        total=len(image_paths), desc="Preprocessing images", unit="img",
+        total=len(image_paths), desc="Embedding images", unit="img",
     ):
         try:
-            images.append(preprocess_image(Image.open(path)))
-        except OSError as e:
+            embeddings.append(embed_image(path))
+        except FileNotFoundError as e:
             print(f"Skipping unreadable image {path}: {e}")
             continue
         good_prirefs.append(priref)
         good_filenames.append(filename)
     priref_list, filename_list = good_prirefs, good_filenames
 
-    if not images:
+    if not embeddings:
         raise SystemExit("All local images failed to load — nothing to embed")
 
-    embeddings = embed_images(images)
+    embeddings = np.concatenate(embeddings, axis=0)
 
     ############################
     ### Save Embeddings ###
@@ -95,7 +102,7 @@ def main():
 
     # one row per image (not per priref) — a priref with N cached images
     # gets N rows here, all sharing the same priref value
-    output_path = 'data/image_embeddings.npz'
+    output_path = os.path.join(DATA_DIR, 'image_embeddings.npz')
     np.savez(
         output_path,
         priref=np.array(priref_list),
@@ -103,7 +110,3 @@ def main():
         embeddings=embeddings,
     )
     print(f"Saved {len(embeddings)} image embeddings ({len(set(priref_list))} prirefs) to {output_path}")
-
-
-if __name__ == '__main__':
-    main()

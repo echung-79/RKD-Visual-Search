@@ -1,18 +1,24 @@
+import os
+
+from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
 from qdrant_client.models import Distance, VectorParams, PointStruct, Document
 import pandas as pd
+from encode_image import DATA_DIR
 from preprocess import preprocess
+
+load_dotenv()
 
 # Use Cloud-Hosted Qdrant Cluster for Vector Store
 client = QdrantClient(
-    url="https://389b72a9-0e48-4b10-a506-48eb90a8384e.eu-central-1-0.aws.cloud.qdrant.io:6333",
-    api_key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIiwic3ViamVjdCI6ImFwaS1rZXk6NmE5NWIzNDMtNTA1OC00YzU5LWI3ZmUtN2Q0NWFlMjRlNGM5In0.IcZaxps02ap0d-QxGkswAydyE3Y1aij8Rpfwm6mbMVQ",
+    url=os.environ["QDRANT_URL"],
+    api_key=os.environ["QDRANT_API_KEY"],
     cloud_inference=True
 )
 
 
 if __name__ == "__main__":
-    rkd_df = pd.read_csv('data/adlib.csv', encoding='utf-8-sig')
+    rkd_df = pd.read_csv(os.path.join(DATA_DIR, 'adlib.csv'), encoding='utf-8-sig')
     input_features = ['title_en', 'attributions', 'genre_en', 'keywords_en', 'date_begin', 'date_end', 'objectcategorie_en']
     processed_df = preprocess(rkd_df[['priref'] + input_features])
 
@@ -28,6 +34,7 @@ if __name__ == "__main__":
             'title-sparse': Document(
                 text = str(row.title_en),
                 model = "Qdrant/bm25"),
+            'siglip_description': row.description_vec,
         }
         if row.image_vecs:
             vector['image'] = row.image_vecs
@@ -44,7 +51,7 @@ if __name__ == "__main__":
 
     # upload points to collection in batch
     client.upload_points(
-      collection_name="RKDTestSet3",
+      collection_name="RKDTestSet4",
       points=points,
       batch_size=100,
       parallel=4
