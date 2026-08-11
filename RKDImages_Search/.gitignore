@@ -8,3 +8,4 @@ server.log
 app.py
 query_testing_colab.ipynb
 visualize_embeddings.py
+embeddings_tsne_3d.html
