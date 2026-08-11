@@ -6,6 +6,8 @@ from qdrant_client.models import Distance
 
 load_dotenv()
 
+# Run to create collection on Qdrant Cluster
+
 client = QdrantClient(
     url = os.environ["QDRANT_URL"],
     api_key = os.environ["QDRANT_API_KEY"],

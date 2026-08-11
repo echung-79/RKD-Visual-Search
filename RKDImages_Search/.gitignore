@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.npz
+server.log
+app.py
+query_testing_colab.ipynb
+visualize_embeddings.py
