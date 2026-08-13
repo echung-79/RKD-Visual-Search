@@ -4,8 +4,13 @@ __pycache__/
 .venv/
 venv/
 *.npz
+*.csv
 server.log
 app.py
 query_testing_colab.ipynb
 visualize_embeddings.py
 embeddings_tsne_3d.html
+inject_test_records.ipynb
+compare_images.py
+.gitignore
+failed_urls.txt

@@ -4,21 +4,20 @@ from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
 from qdrant_client.models import Distance, VectorParams, PointStruct, Document
 import pandas as pd
-from embed import DATA_DIR
-from preprocess import preprocess
+from preprocess import TESTSET_PATH, preprocess
 
 load_dotenv()
 
 # Use Cloud-Hosted Qdrant Cluster for Vector Store
 client = QdrantClient(
-    url=os.environ["QDRANT_URL"],
-    api_key=os.environ["QDRANT_API_KEY"],
-    cloud_inference=True
+    url = os.environ["QDRANT_URL"],
+    api_key = os.environ["QDRANT_API_KEY"],
+    cloud_inference = True
 )
 
 
 if __name__ == "__main__":
-    rkd_df = pd.read_csv(os.path.join(DATA_DIR, 'adlib.csv'), encoding='utf-8-sig')
+    rkd_df = pd.read_csv(TESTSET_PATH, encoding='utf-8-sig')
     input_features = ['title_en', 'attributions', 'genre_en', 'keywords_en', 'date_begin', 'date_end', 'objectcategorie_en']
     processed_df = preprocess(rkd_df[['priref'] + input_features])
 
@@ -51,7 +50,7 @@ if __name__ == "__main__":
 
     # upload points to collection in batch
     client.upload_points(
-      collection_name="RKDTestSet4",
+      collection_name = os.environ["COLLECTION_NAME"],
       points=points,
       batch_size=100,
       parallel=4

@@ -9,17 +9,17 @@ load_dotenv()
 client = QdrantClient(
     url = os.environ["QDRANT_URL"],
     api_key = os.environ["QDRANT_API_KEY"],
-    cloud_inference=True
+    cloud_inference = True
 )
 
 client.create_collection(
-    collection_name = "RKDTestSet4",
+    collection_name = os.environ["COLLECTION_NAME"],
     vectors_config={
         "description" : models.VectorParams(
             size = 384,
             distance = Distance.COSINE),
         "image" : models.VectorParams(
-            size = 768,
+            size = 1024,
             distance = models.Distance.COSINE,
             multivector_config = models.MultiVectorConfig(
                 comparator = models.MultiVectorComparator.MAX_SIM)),

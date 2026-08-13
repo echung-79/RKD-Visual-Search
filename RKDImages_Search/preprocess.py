@@ -1,12 +1,12 @@
+import ast
 import os
 
-import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from embed import DATA_DIR, embed_text
+from embed import DATA_DIR, IMAGE_EMBEDDINGS_PATH, embed_text
 
-IMAGE_EMBEDDINGS_PATH = os.path.join(DATA_DIR, 'image_embeddings.npz')
+TESTSET_PATH = os.path.join(DATA_DIR, 'testset.csv')
 
 ############################
 ### Pre Processing Logic ###
@@ -49,22 +49,21 @@ def _build_text(row):
         text += f" Depicting {keywords_str}."
     return text
 
-def _load_image_vecs(path):
-    """Group per-image SigLIP2 embeddings by priref (a priref can have multiple images)."""
-    data = np.load(path)
-    vecs_by_priref = {}
-    for priref, vec in zip(data['priref'], data['embeddings']):
-        vecs_by_priref.setdefault(priref, []).append(vec.tolist())
-    return vecs_by_priref
+def load_image_vectors(path=IMAGE_EMBEDDINGS_PATH):
+    """Reads image_embeddings.csv and links each SIGLIP vector to a priref"""
+    embeddings_df = pd.read_csv(path, encoding = 'utf-8-sig')
+    embeddings_df['embedding'] = embeddings_df['embedding'].apply(ast.literal_eval)
+    return embeddings_df.groupby('priref')['embedding'].agg(list)
 
-def preprocess(df, image_embeddings_path=IMAGE_EMBEDDINGS_PATH):
-    """Builds a natural language document and attaches SigLIP2 image + description vectors for each record"""
+def preprocess(df):
+    """Builds and runs inference on a natural language description of each record.
+    These embeddings are joined with those from image_embeddings.csv into a dataframe"""
     df = df.copy()
     df['embedding_text'] = df.apply(_build_text, axis=1)
-    vecs_by_priref = _load_image_vecs(image_embeddings_path)
-    df['image_vecs'] = df['priref'].map(lambda p: vecs_by_priref.get(p, []))
+    image_vecs = df['priref'].map(load_image_vectors())
+    df['image_vecs'] = image_vecs.apply(lambda v: v if isinstance(v, list) else [])
     df['description_vec'] = [
         embed_text(text)[0].tolist()
-        for text in tqdm(df['embedding_text'], desc="Embedding descriptions", unit="rec")
+        for text in tqdm(df['embedding_text'], desc = "Embedding descriptions", unit = "rec")
     ]
     return df
