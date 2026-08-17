@@ -54,11 +54,11 @@ Each query subject's vector is searched against the indexed collection (grouped 
 | Path                            | Purpose                                                                                    |
 | ------------------------------- | ------------------------------------------------------------------------------------------ |
 | `segment_demonstration.ipynb` | Single-image walkthrough of the whole pipeline; start here                                 |
-| `create_collection.py`        | One-time setup of the Qdrant "Segments" collection                                         |
+| `create_collection.py`        | One-time setup of your QDrant collection with appropriate point and vector parameters      |
 | `index_segments.py`           | Batch indexing: reads a records CSV, fetches IIIF images, detects/segments/embeds/uploads  |
 | `query_collection.py`         | CLI to query the collection with a new image (`python query_collection.py <image_path>`) |
-| `data/` | Records CSV, plus generated `segments/` and `queries/` output |
-| `images/` | Sample images used by the demo notebook |
+| `data/`                       | Records CSV, plus generated`segments/` and `queries/` output                           |
+| `images/`                     | Sample images used by the demo notebook                                                    |
 
 ## Setup
 
@@ -66,7 +66,7 @@ Each query subject's vector is searched against the indexed collection (grouped 
 2. Copy `.env.example` to `.env` and fill in:
    - `QDRANT_URL` / `QDRANT_API_KEY` — your Qdrant cluster
    - `COLLECTION_NAME` — name of the segment collection
-   - `CSV_NAME` — records CSV (with IIIF media URLs) inside `data/`
+   - `CSV_NAME` — records CSV (with proper column names and IIIF media URLs) inside `data/`
 3. Download/place `yolo26x-seg.pt` in the project root.
 4. Run `python create_collection.py` once to provision the Qdrant collection.
 5. Run `python index_segments.py` to populate it from `data/<CSV_NAME>`.
