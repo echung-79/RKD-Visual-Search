@@ -15,10 +15,10 @@ client = QdrantClient(
 )
 
 client.create_collection(
-    collection_name = "Segments",
+    collection_name = os.environ["COLLECTION_NAME"],
     vectors_config={
-        "SIGLIP" : models.VectorParams(
-            size = 768,
+        "DinoV2" : models.VectorParams(
+            size = 1024,
             distance = Distance.COSINE)
             }
 )
